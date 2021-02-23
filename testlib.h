@@ -2601,42 +2601,16 @@ NORETURN void InStream::quit(TResult result, const char *msg) {
     if (TestlibFinalizeGuard::alive)
         testlibFinalizeGuard.quitCount++;
 
-    std::string message(msg);
-    message = trim(message);
-
-    if (__testlib_hasTestCase) {
-        if (result != _ok)
-            message = __testlib_appendMessage(message, "test case " + vtos(__testlib_testCase));
-        else {
-            if (__testlib_testCase == 1)
-                message = __testlib_appendMessage(message, vtos(__testlib_testCase) + " test case");
-            else
-                message = __testlib_appendMessage(message, vtos(__testlib_testCase) + " test cases");
-        }
-    }
-
-    // You can change maxMessageLength.
-    // Example: 'inf.maxMessageLength = 1024 * 1024;'.
-    if (message.length() > maxMessageLength) {
-        std::string warn = "message length exceeds " + vtos(maxMessageLength)
-                           + ", the message is truncated: ";
-        message = warn + message.substr(0, maxMessageLength - warn.length());
-    }
-
+    //Changed Part(standard manager output)
 #ifndef ENABLE_UNEXPECTED_EOF
     if (result == _unexpected_eof)
         result = _pe;
 #endif
 
     if (mode != _output && result != _fail) {
-        if (mode == _input && testlibMode == _validator && lastLine != -1)
-            quits(_fail, __testlib_appendMessage(__testlib_appendMessage(message, name), "line " + vtos(lastLine)));
-        else
-            quits(_fail, __testlib_appendMessage(message, name));
+        if (mode == _input && testlibMode == _validator && lastLine != -1) quits(_fail, "Wrong Answer");
+        else quits(_fail, "Wrong Answer");
     }
-
-    std::FILE *resultFile;
-    std::string errorName;
 
     if (__testlib_shouldCheckDirt(result)) {
         if (testlibMode != _interactor && !ouf.seekEof())
@@ -2644,94 +2618,50 @@ NORETURN void InStream::quit(TResult result, const char *msg) {
     }
 
     int pctype = result - _partially;
-    bool isPartial = false;
-
-    switch (result) {
+    int __exitcode = 0;
+    char * __score, * __msg;
+    switch(result) {
         case _ok:
-            errorName = "ok ";
-            quitscrS(LightGreen, errorName);
-            break;
-        case _wa:
-            errorName = "wrong answer ";
-            quitscrS(LightRed, errorName);
-            break;
-        case _pe:
-            errorName = "wrong output format ";
-            quitscrS(LightRed, errorName);
-            break;
+        __score = "1.0";
+        __msg = "translate:success";
+        break;
+
         case _fail:
-            errorName = "FAIL ";
-            quitscrS(LightRed, errorName);
-            break;
+        __exitcode = 1;
+        case _wa:
+        case _pe:
         case _dirt:
-            errorName = "wrong output format ";
-            quitscrS(LightCyan, errorName);
-            result = _pe;
-            break;
-        case _points:
-            errorName = "points ";
-            quitscrS(LightYellow, errorName);
-            break;
         case _unexpected_eof:
-            errorName = "unexpected eof ";
-            quitscrS(LightCyan, errorName);
-            break;
+        __score = "0.0";
+        __msg = "translate:wrong";
+        break;
+
+        case _points:
+        __score = (char*)malloc(20);
+        sprintf(__score, "%.3f\n", __testlib_points);
+        __msg = "translate:partial";
+        break;
+
         default:
-            if (result >= _partially) {
-                errorName = format("partially correct (%d) ", pctype);
-                isPartial = true;
-                quitscrS(LightYellow, errorName);
-            } else
-                quit(_fail, "What is the code ??? ");
-    }
-
-    if (resultName != "") {
-        resultFile = std::fopen(resultName.c_str(), "w");
-        if (resultFile == NULL) {
-            resultName = "";
-            quit(_fail, "Can not write to the result file");
-        }
-        if (appesMode) {
-            std::fprintf(resultFile, "<?xml version=\"1.0\" encoding=\"windows-1251\"?>");
-            if (isPartial)
-                std::fprintf(resultFile, "<result outcome = \"%s\" pctype = \"%d\">",
-                             outcomes[(int) _partially].c_str(), pctype);
-            else {
-                if (result != _points)
-                    std::fprintf(resultFile, "<result outcome = \"%s\">", outcomes[(int) result].c_str());
-                else {
-                    if (__testlib_points == std::numeric_limits<float>::infinity())
-                        quit(_fail, "Expected points, but infinity found");
-                    std::string stringPoints = removeDoubleTrailingZeroes(format("%.10f", __testlib_points));
-                    std::fprintf(resultFile, "<result outcome = \"%s\" points = \"%s\">",
-                                 outcomes[(int) result].c_str(), stringPoints.c_str());
-                }
-            }
-            xmlSafeWrite(resultFile, __testlib_toPrintableMessage(message).c_str());
-            std::fprintf(resultFile, "</result>\n");
-        } else
-            std::fprintf(resultFile, "%s", __testlib_toPrintableMessage(message).c_str());
-        if (NULL == resultFile || fclose(resultFile) != 0) {
-            resultName = "";
-            quit(_fail, "Can not write to the result file");
+        if(result >= _partially) {
+            __score = (char*)malloc(20);
+            sprintf(__score, "%.3f\n", (double)pctype / 200.0);
+            __msg = "translate:partial";
+        } else {
+            __score = "0.0";
+            __msg = "translate:wrong";
+            __exitcode = 1;
         }
     }
-
-    quitscr(LightGray, __testlib_toPrintableMessage(message).c_str());
-    std::fprintf(stderr, "\n");
-
+    std::fprintf(stdout, __score);
+    std::fprintf(stderr, __msg);
     inf.close();
     ouf.close();
     ans.close();
     if (tout.is_open())
         tout.close();
-
-    textColor(LightGray);
-
-    if (resultName != "")
-        std::fprintf(stderr, "See file to check exit message\n");
-
-    halt(resultExitCode(result));
+    halt(__exitcode);
+    //END
 }
 
 #ifdef __GNUC__
@@ -4171,8 +4101,8 @@ void registerTestlibCmd(int argc, char *argv[]) {
     }
 
     inf.init(argv[1], _input);
-    ouf.init(argv[2], _output);
-    ans.init(argv[3], _answer);
+    ouf.init(argv[3], _output);
+    ans.init(argv[2], _answer);
 }
 
 void registerTestlib(int argc, ...) {
