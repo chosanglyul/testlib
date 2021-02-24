@@ -15,14 +15,15 @@
  *
  * Also read about wnext() to generate off-center random distribution.
  *
- * See https://github.com/MikeMirzayanov/testlib/ to get latest version or bug tracker.
+ * See https://github.com/chosanglyul/testlib to get latest version or bug tracker.
+ * (Mike Mirzayanov's version is in : https://github.com/MikeMirzayanov/testlib/)
  */
 
 #ifndef _TESTLIB_H_
 #define _TESTLIB_H_
 
 /*
- * Copyright (c) 2005-2020
+ * Copyright (c) 2005-2021
  */
 
 #define VERSION "0.9.34-SNAPSHOT"
@@ -41,14 +42,22 @@
  *
  */
 
+/*
+ * SangLyul Cho
+ * 
+ * Ported testlib to CMS.
+ * Puts score to stdout and message(translate:'result') to stderr.
+ * It was ported in Feb 2021.
+ */
+
 /* NOTE: This file contains testlib library for C++.
  *
  *   Check, using testlib running format:
- *     check.exe <Input_File> <Output_File> <Answer_File> [<Result_File> [-appes]],
+ *     check.exe <Input_File> <Answer_File> <Output_File> [<Result_File> [-appes]],
  *   If result file is specified it will contain results.
  *
  *   Validator, using testlib running format:                                          
- *     validator.exe < input.txt,
+ *     validator.exe < input.txt (or change stdin to input.txt), 
  *   It will return non-zero exit code and writes message to standard output.
  *
  *   Generator, using testlib running format:                                          
@@ -2601,7 +2610,7 @@ NORETURN void InStream::quit(TResult result, const char *msg) {
     if (TestlibFinalizeGuard::alive)
         testlibFinalizeGuard.quitCount++;
 
-    //Changed Part(standard manager output)
+    // Changed Part(standard manager output)
 #ifndef ENABLE_UNEXPECTED_EOF
     if (result == _unexpected_eof)
         result = _pe;
@@ -2622,8 +2631,8 @@ NORETURN void InStream::quit(TResult result, const char *msg) {
     char * __score, * __msg;
     switch(result) {
         case _ok:
-        __score = "1.0";
-        __msg = "translate:success";
+        __score = (char *)"1.0";
+        __msg = (char *)"translate:success";
         break;
 
         case _fail:
@@ -2632,36 +2641,36 @@ NORETURN void InStream::quit(TResult result, const char *msg) {
         case _pe:
         case _dirt:
         case _unexpected_eof:
-        __score = "0.0";
-        __msg = "translate:wrong";
+        __score = (char *)"0.0";
+        __msg = (char *)"translate:wrong";
         break;
 
         case _points:
         __score = (char*)malloc(20);
-        sprintf(__score, "%.3f\n", __testlib_points);
-        __msg = "translate:partial";
+        sprintf(__score, "%.3f", __testlib_points);
+        __msg = (char *)"translate:partial";
         break;
 
         default:
         if(result >= _partially) {
             __score = (char*)malloc(20);
-            sprintf(__score, "%.3f\n", (double)pctype / 200.0);
-            __msg = "translate:partial";
+            sprintf(__score, "%.3f", (double)pctype / 200.0);
+            __msg = (char *)"translate:partial";
         } else {
-            __score = "0.0";
-            __msg = "translate:wrong";
+            __score = (char *)"0.0";
+            __msg = (char *)"translate:wrong";
             __exitcode = 1;
         }
     }
-    std::fprintf(stdout, __score);
-    std::fprintf(stderr, __msg);
+    std::fprintf(stdout, "%s\n", __score);
+    std::fprintf(stderr, "%s\n", __msg);
     inf.close();
     ouf.close();
     ans.close();
     if (tout.is_open())
         tout.close();
     halt(__exitcode);
-    //END
+    // END
 }
 
 #ifdef __GNUC__
@@ -4101,8 +4110,10 @@ void registerTestlibCmd(int argc, char *argv[]) {
     }
 
     inf.init(argv[1], _input);
+    // Changed Part(CMS's argv is reversed)
     ouf.init(argv[3], _output);
     ans.init(argv[2], _answer);
+    // END
 }
 
 void registerTestlib(int argc, ...) {
